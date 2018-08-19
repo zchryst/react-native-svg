@@ -22,6 +22,7 @@ import android.util.Base64;
 import com.facebook.react.uimanager.DisplayMetricsHolder;
 import com.facebook.react.uimanager.LayoutShadowNode;
 import com.facebook.react.uimanager.ReactShadowNode;
+import com.facebook.react.uimanager.ReactShadowNodeImpl;
 import com.facebook.react.uimanager.UIViewOperationQueue;
 import com.facebook.react.uimanager.annotations.ReactProp;
 
@@ -128,19 +129,24 @@ public class SvgViewShadowNode extends LayoutShadowNode {
         SvgViewManager.setShadowNode(this);
     }
 
-    private Object drawOutput() {
-        int layoutWidth = (int) getLayoutWidth();
-        int layoutHeight = (int) getLayoutHeight();
-        if(layoutHeight != 0 && layoutWidth != 0) {
-            Bitmap bitmap = Bitmap.createBitmap(
-                    layoutWidth,
-                    layoutHeight,
-                    Bitmap.Config.ARGB_8888);
-
-            drawChildren(new Canvas(bitmap));
-            return bitmap;
+    Bitmap drawOutput() {
+        float width = getLayoutWidth();
+        float height = getLayoutHeight();
+        boolean early = Float.isNaN(width) || Float.isNaN(height) || width * height == 0 || (Math.log10(width) + Math.log10(height) > 42);
+        if (early) {
+            ReactShadowNodeImpl parent = getParent();
+            float parentWidth = parent == null ? 0 : parent.getLayoutWidth();
+            float parentHeight = parent == null ? 0 : parent.getLayoutHeight();
+            width = (float) PropHelper.fromRelative(mbbWidth, parentWidth, 0, mScale, 12);
+            height = (float) PropHelper.fromRelative(mbbHeight, parentHeight, 0, mScale, 12);
         }
-        return null;
+        Bitmap bitmap = Bitmap.createBitmap(
+                (int) width,
+                (int) height,
+                Bitmap.Config.ARGB_8888);
+
+        drawChildren(new Canvas(bitmap));
+        return bitmap;
     }
 
     Rect getCanvasBounds() {
@@ -155,8 +161,8 @@ public class SvgViewShadowNode extends LayoutShadowNode {
             float height;
             boolean nested = getNativeParent() instanceof SvgViewShadowNode;
             if (nested) {
-                width = Float.parseFloat(mbbWidth) * mScale;
-                height = Float.parseFloat(mbbHeight) * mScale;
+                width = (float) PropHelper.fromRelative(mbbWidth, canvas.getWidth(), 0f, mScale, 12);
+                height = (float) PropHelper.fromRelative(mbbHeight, canvas.getHeight(), 0f, mScale, 12);
             } else {
                 width = getLayoutWidth();
                 height = getLayoutHeight();
@@ -239,11 +245,12 @@ public class SvgViewShadowNode extends LayoutShadowNode {
         int count = getChildCount();
         int viewTag = -1;
         for (int i = count - 1; i >= 0; i--) {
-            if (!(getChildAt(i) instanceof VirtualNode)) {
+            ReactShadowNodeImpl child = getChildAt(i);
+            if (!(child instanceof VirtualNode)) {
                 continue;
             }
 
-            viewTag = ((VirtualNode) getChildAt(i)).hitTest(transformed);
+            viewTag = ((VirtualNode) child).hitTest(transformed);
             if (viewTag != -1) {
                 break;
             }

@@ -17,8 +17,13 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Region;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.Dynamic;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
+import com.facebook.react.bridge.JavaOnlyArray;
 import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.bridge.ReadableType;
+import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.uimanager.OnLayoutEvent;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.annotations.ReactProp;
@@ -39,17 +44,17 @@ abstract public class RenderableShadowNode extends VirtualNode {
 
     // strokeLinecap
     private static final int CAP_BUTT = 0;
-    private static final int CAP_ROUND = 1;
+    static final int CAP_ROUND = 1;
     private static final int CAP_SQUARE = 2;
 
     // strokeLinejoin
     private static final int JOIN_BEVEL = 2;
     private static final int JOIN_MITER = 0;
-    private static final int JOIN_ROUND = 1;
+    static final int JOIN_ROUND = 1;
 
     // fillRule
     private static final int FILL_RULE_EVENODD = 0;
-    private static final int FILL_RULE_NONZERO = 1;
+    static final int FILL_RULE_NONZERO = 1;
 
     public @Nullable ReadableArray mStroke;
     public @Nullable String[] mStrokeDasharray;
@@ -71,9 +76,24 @@ abstract public class RenderableShadowNode extends VirtualNode {
     protected @Nullable ArrayList<String> mPropList;
     protected @Nullable ArrayList<String> mAttributeList;
 
+    static final Pattern regex = Pattern.compile("[0-9.-]+");
+
     @ReactProp(name = "fill")
-    public void setFill(@Nullable ReadableArray fill) {
-        mFill = fill;
+    public void setFill(@Nullable Dynamic fill) {
+        ReadableType type = fill.getType();
+        if (type.equals(ReadableType.Array)) {
+            mFill = fill.asArray();
+        } else {
+            JavaOnlyArray arr = new JavaOnlyArray();
+            arr.pushInt(0);
+            Matcher m = regex.matcher(fill.asString());
+            int i = 0;
+            while (m.find()) {
+                Double parsed = Double.parseDouble(m.group());
+                arr.pushDouble(i++ < 3 ? parsed / 255 : parsed);
+            }
+            mFill = arr;
+        }
         markUpdated();
     }
 
@@ -100,8 +120,20 @@ abstract public class RenderableShadowNode extends VirtualNode {
     }
 
     @ReactProp(name = "stroke")
-    public void setStroke(@Nullable ReadableArray strokeColors) {
-        mStroke = strokeColors;
+    public void setStroke(@Nullable Dynamic strokeColors) {
+        ReadableType type = strokeColors.getType();
+        if (type.equals(ReadableType.Array)) {
+            mStroke = strokeColors.asArray();
+        } else {
+            JavaOnlyArray arr = new JavaOnlyArray();
+            arr.pushInt(0);
+            Matcher m = regex.matcher(strokeColors.asString());
+            while (m.find()) {
+                Double parsed = Double.parseDouble(m.group());
+                arr.pushDouble(parsed);
+            }
+            mStroke = arr;
+        }
         markUpdated();
     }
 
@@ -126,8 +158,8 @@ abstract public class RenderableShadowNode extends VirtualNode {
     }
 
     @ReactProp(name = "strokeDashoffset")
-    public void setStrokeDashoffset(float strokeWidth) {
-        mStrokeDashoffset = strokeWidth * mScale;
+    public void setStrokeDashoffset(float strokeDashoffset) {
+        mStrokeDashoffset = strokeDashoffset * mScale;
         markUpdated();
     }
 
@@ -203,9 +235,10 @@ abstract public class RenderableShadowNode extends VirtualNode {
                 mPath = getPath(canvas, paint);
                 mPath.setFillType(mFillRule);
             }
+            Path path = mPath;
 
             RectF clientRect = new RectF();
-            mPath.computeBounds(clientRect, true);
+            path.computeBounds(clientRect, true);
             Matrix svgToViewMatrix = new Matrix(canvas.getMatrix());
             svgToViewMatrix.mapRect(clientRect);
             this.setClientRect(clientRect);
@@ -213,10 +246,10 @@ abstract public class RenderableShadowNode extends VirtualNode {
             clip(canvas, paint);
 
             if (setupFillPaint(paint, opacity * mFillOpacity)) {
-                canvas.drawPath(mPath, paint);
+                canvas.drawPath(path, paint);
             }
             if (setupStrokePaint(paint, opacity * mStrokeOpacity)) {
-                canvas.drawPath(mPath, paint);
+                canvas.drawPath(path, paint);
             }
         }
     }

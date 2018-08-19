@@ -66,6 +66,12 @@ public class SvgView extends ViewGroup {
         mEventDispatcher = reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher();
     }
 
+    public void addView(View child, int index, LayoutParams params) {
+        if (!(child instanceof RenderableView)) {
+            super.addView(child, index, params);
+        }
+    }
+
     @Override
     public void setId(int id) {
         super.setId(id);
@@ -133,6 +139,8 @@ public class SvgView extends ViewGroup {
                     child.layout(Math.round(x), Math.round(y), Math.round(nr), Math.round(nb));
                     break;
                 }
+            } else {
+                child.layout(l, t, r , b);
             }
         }
     }
